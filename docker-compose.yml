@@ -1,35 +1,116 @@
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: contracts-postgres
+    container_name: smart-home-postgres
     environment:
       POSTGRES_DB: contracts_db
-      POSTGRES_USER: app_user
-      POSTGRES_PASSWORD: app_password
+      POSTGRES_USER: ${DB_USER:-app_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-app_password}
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - smart-home-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app_user -d contracts_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-app_user} -d contracts_db"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   redis:
     image: redis:7-alpine
-    container_name: contracts-redis
-    command: ["redis-server", "--appendonly", "yes"]
+    container_name: smart-home-redis
     ports:
       - "6379:6379"
-    volumes:
-      - redis_data:/data
+    networks:
+      - smart-home-net
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+
+  contracts-app:
+    build:
+      context: .
+      dockerfile: contracts-app/Dockerfile
+    container_name: smart-home-contracts-app
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      SERVER_PORT: 8080
+      DB_URL: jdbc:postgresql://postgres:5432/contracts_db
+      DB_USER: ${DB_USER:-app_user}
+      DB_PASSWORD: ${DB_PASSWORD:-app_password}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MCP_SERVER_URL: http://contracts-mcp-server:8081
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.example.com}
+      AI_API_KEY: ${AI_API_KEY:-changeme}
+      AI_CHAT_MODEL: ${AI_CHAT_MODEL:-chat-model}
+      AI_VISION_MODEL: ${AI_VISION_MODEL:-vision-model}
+      AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-embedding-model}
+      AI_EMBEDDING_DIMENSIONS: ${AI_EMBEDDING_DIMENSIONS:-1024}
+      AI_CHAT_COMPLETIONS_PATH: ${AI_CHAT_COMPLETIONS_PATH:-/v1/chat/completions}
+      AI_EMBEDDINGS_PATH: ${AI_EMBEDDINGS_PATH:-/v1/embeddings}
+      APP_ADMIN_KEY: ${APP_ADMIN_KEY:-replace-with-strong-admin-key}
+      APP_BOOTSTRAP_API_KEY: ${APP_BOOTSTRAP_API_KEY:-}
+      APP_BOOTSTRAP_TENANT_ID: ${APP_BOOTSTRAP_TENANT_ID:-smart-power}
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - smart-home-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  contracts-mcp-server:
+    build:
+      context: .
+      dockerfile: contracts-mcp-server/Dockerfile
+    container_name: smart-home-mcp-server
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      MCP_SERVER_PORT: 8081
+      DB_URL: jdbc:postgresql://postgres:5432/contracts_db
+      DB_USER: ${DB_USER:-app_user}
+      DB_PASSWORD: ${DB_PASSWORD:-app_password}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.example.com}
+      AI_API_KEY: ${AI_API_KEY:-changeme}
+      AI_EMBEDDING_MODEL: ${AI_EMBEDDING_MODEL:-embedding-model}
+      AI_EMBEDDING_DIMENSIONS: ${AI_EMBEDDING_DIMENSIONS:-1024}
+      AI_EMBEDDINGS_PATH: ${AI_EMBEDDINGS_PATH:-/v1/embeddings}
+    ports:
+      - "127.0.0.1:${MCP_SERVER_PORT:-8081}:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      contracts-app:
+        condition: service_healthy
+    networks:
+      - smart-home-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8081/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
 
 volumes:
-  postgres_data:
-  redis_data:
+  pgdata:
+
+networks:
+  smart-home-net:
+    driver: bridge

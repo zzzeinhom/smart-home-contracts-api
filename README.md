@@ -1,5 +1,6 @@
 # Smart Home Contracts & Operations AI Platform
 
+![CI](https://github.com/zzzeinhom/smart-home-contracts-api/actions/workflows/ci.yml/badge.svg)
 ![Java 21](https://img.shields.io/badge/Java-21-orange)
 ![Spring Boot 3.4](https://img.shields.io/badge/Spring%20Boot-3.4-brightgreen)
 ![Spring AI](https://img.shields.io/badge/Spring%20AI-1.0-blue)
@@ -62,15 +63,26 @@ flowchart LR
 - Java 21 (JDK 21) and Apache Maven 3.9+
 - Docker & Docker Compose (for local PostgreSQL/Redis, Testcontainers, and multi-stage image builds)
 
-### 1. Start Infrastructure & Configure Environment
+### 1. Configure Environment
 ```bash
-docker compose up -d
 cp .env.example .env
 ```
 Edit `.env` with your upstream OpenAI-compatible `AI_BASE_URL`, `AI_API_KEY`, model settings (`AI_CHAT_MODEL`, `AI_VISION_MODEL`, `AI_EMBEDDING_MODEL`), and a strong `APP_ADMIN_KEY`.
 
-### 2. Build & Run Both Services
+### 2. Launch the Stack
+
+#### Option A — Full-Stack One-Command Docker Compose Launch
+Builds and starts all 4 containers (`postgres`, `redis`, `contracts-app`, and `contracts-mcp-server`) with healthcheck-ordered startup (`contracts-app` completes Flyway `V1`–`V4` migrations before `contracts-mcp-server` validates the schema), while overriding `localhost` endpoints automatically on `smart-home-net`:
+
 ```bash
+docker compose up -d --build
+```
+
+#### Option B — Hybrid Local Development (Infra in Docker + Maven Apps)
+Start only PostgreSQL and Redis in Docker, then run both Spring Boot services locally:
+
+```bash
+docker compose up -d postgres redis
 mvn clean install -DskipTests
 
 # Terminal 1: Start decoupled MCP operations server (port 8081)

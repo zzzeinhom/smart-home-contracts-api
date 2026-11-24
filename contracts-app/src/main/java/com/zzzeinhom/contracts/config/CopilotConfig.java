@@ -17,6 +17,8 @@ import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.definition.DefaultToolDefinition;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.springframework.ai.tool.metadata.ToolMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -36,6 +38,7 @@ import java.util.function.Consumer;
 @EnableConfigurationProperties({McpSseClientProperties.class, McpClientCommonProperties.class})
 public class CopilotConfig {
 
+    private static final Logger log = LoggerFactory.getLogger(CopilotConfig.class);
     private static final int CHAT_MEMORY_MAX_MESSAGES = 12;
 
     @Bean
@@ -95,16 +98,29 @@ public class CopilotConfig {
                     .toList();
             Map<String, ToolCallback> callbacksByName = new LinkedHashMap<>();
             for (McpSyncClient client : clients) {
-                McpSchema.ListToolsResult listToolsResult = client.listTools();
-                if (listToolsResult == null || listToolsResult.tools() == null) {
-                    continue;
-                }
-                for (McpSchema.Tool tool : listToolsResult.tools()) {
-                    if (tool == null || tool.name() == null || tool.name().isBlank()) {
+                try {
+                    if (!client.isInitialized()) {
+                        synchronized (client) {
+                            if (!client.isInitialized()) {
+                                client.initialize();
+                            }
+                        }
+                    }
+                    McpSchema.ListToolsResult listToolsResult = client.listTools();
+                    if (listToolsResult == null || listToolsResult.tools() == null) {
                         continue;
                     }
-                    SyncMcpToolCallback delegate = new SyncMcpToolCallback(client, tool);
-                    callbacksByName.putIfAbsent(tool.name(), new UnprefixedToolCallback(tool.name(), delegate));
+                    for (McpSchema.Tool tool : listToolsResult.tools()) {
+                        if (tool == null || tool.name() == null || tool.name().isBlank()) {
+                            continue;
+                        }
+                        SyncMcpToolCallback delegate = new SyncMcpToolCallback(client, tool);
+                        callbacksByName.putIfAbsent(tool.name(), new UnprefixedToolCallback(tool.name(), delegate));
+                    }
+                } catch (RuntimeException ex) {
+                    String clientName = client.getClientInfo() != null ? client.getClientInfo().name() : "unknown";
+                    log.warn("MCP client '{}' is not ready yet; skipping tool discovery: {}",
+                            clientName, ex.getMessage());
                 }
             }
             return callbacksByName.values().toArray(ToolCallback[]::new);
