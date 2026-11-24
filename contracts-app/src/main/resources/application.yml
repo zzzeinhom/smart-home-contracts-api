@@ -1,0 +1,70 @@
+spring:
+  application:
+    name: smart-home-contracts-api
+  config:
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/contracts_db}
+    username: ${DB_USER:${DB_USERNAME:app_user}}
+    password: ${DB_PASSWORD:app_password}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+  ai:
+    openai:
+      base-url: ${AI_BASE_URL:https://api.example.com}
+      api-key: ${AI_API_KEY:changeme}
+      chat:
+        completions-path: ${AI_CHAT_COMPLETIONS_PATH:/v1/chat/completions}
+        options:
+          model: ${AI_CHAT_MODEL:${AI_MODEL:chat-model}}
+          temperature: 0.0
+      embedding:
+        embeddings-path: ${AI_EMBEDDINGS_PATH:/v1/embeddings}
+        options:
+          model: ${AI_EMBEDDING_MODEL:embedding-model}
+          dimensions: ${AI_EMBEDDING_DIMENSIONS:1024}
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: never
+    mcp:
+      client:
+        enabled: true
+        name: smart-home-copilot-client
+        version: 1.0.0
+        request-timeout: 20s
+        type: SYNC
+        sse:
+          connections:
+            operations-mcp:
+              url: ${MCP_SERVER_URL:http://localhost:8081}
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+app:
+  ai:
+    vision-model: ${AI_VISION_MODEL:vision-model}
+  ingestion:
+    max-pdf-pages: 10
+  catalog:
+    similarity-threshold: 0.80
+    price-drift-tolerance-percent: 10.0
