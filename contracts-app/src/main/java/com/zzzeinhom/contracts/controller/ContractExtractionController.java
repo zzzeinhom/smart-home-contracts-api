@@ -7,8 +7,11 @@ import com.zzzeinhom.contracts.dto.ApprovalRequest;
 import com.zzzeinhom.contracts.dto.ClarificationRequest;
 import com.zzzeinhom.contracts.dto.JobStatusResponse;
 import com.zzzeinhom.contracts.security.TenantContext;
+import com.zzzeinhom.contracts.service.ContractExcelExportService;
 import com.zzzeinhom.contracts.service.ContractProcessingService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,10 +29,17 @@ import java.util.Map;
 @RequestMapping("/api/v1/contracts/extract")
 public class ContractExtractionController {
 
-    private final ContractProcessingService processingService;
+    private static final MediaType XLSX_MEDIA_TYPE = MediaType.parseMediaType(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
-    public ContractExtractionController(ContractProcessingService processingService) {
+    private final ContractProcessingService processingService;
+    private final ContractExcelExportService excelExportService;
+
+    public ContractExtractionController(
+            ContractProcessingService processingService,
+            ContractExcelExportService excelExportService) {
         this.processingService = processingService;
+        this.excelExportService = excelExportService;
     }
 
     @PostMapping
@@ -78,6 +88,19 @@ public class ContractExtractionController {
         DocumentPayload payload = buildPayload(file, mode);
         ExtractionResult result = processingService.processContract(tenantId, payload);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping(
+            value = "/{extractionId}/export/xlsx",
+            produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public ResponseEntity<byte[]> exportExtractionToExcel(@PathVariable String extractionId) {
+        String tenantId = TenantContext.requireTenantId();
+        byte[] xlsxBytes = excelExportService.exportToExcel(tenantId, extractionId);
+        String safeFileName = extractionId.replaceAll("[^A-Za-z0-9._-]", "_") + ".xlsx";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safeFileName + "\"")
+                .contentType(XLSX_MEDIA_TYPE)
+                .body(xlsxBytes);
     }
 
     private static DocumentPayload buildPayload(MultipartFile file, ExtractionMode mode) throws IOException {
