@@ -1,6 +1,7 @@
 package com.zzzeinhom.contracts.config;
 
 import com.zzzeinhom.contracts.ai.copilot.CopilotTenantContext;
+import com.zzzeinhom.contracts.security.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -17,6 +18,7 @@ class TenantAwareHttpRequestBuilderTest {
     @AfterEach
     void tearDown() {
         CopilotTenantContext.clear();
+        TenantContext.clear();
         RequestContextHolder.resetRequestAttributes();
     }
 
@@ -59,11 +61,12 @@ class TenantAwareHttpRequestBuilderTest {
     }
 
     @Test
-    void build_fallsBackToServletRequestHeaderWhenCopilotTenantContextIsEmpty() {
+    void build_fallsBackToAuthenticatedTenantContextAndIgnoresUntrustedServletHeader() {
         TenantAwareHttpRequestBuilder sharedTemplate = new TenantAwareHttpRequestBuilder();
         MockHttpServletRequest servletRequest = new MockHttpServletRequest();
-        servletRequest.addHeader(TenantAwareHttpRequestBuilder.TENANT_HEADER, "Cairo-Homes");
+        servletRequest.addHeader(TenantAwareHttpRequestBuilder.TENANT_HEADER, "spoofed-tenant");
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(servletRequest));
+        TenantContext.setTenantId("Cairo-Homes");
 
         HttpRequest outgoingRequest = sharedTemplate
                 .uri(URI.create("http://localhost:8081/mcp/message?sessionId=s3"))
