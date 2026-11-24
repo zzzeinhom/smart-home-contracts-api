@@ -1,11 +1,9 @@
 package com.zzzeinhom.contracts.config;
 
 import com.zzzeinhom.contracts.ai.copilot.CopilotTenantContext;
+import com.zzzeinhom.contracts.security.TenantContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.web.context.request.RequestAttributes;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -52,11 +50,7 @@ public class TenantAwareHttpRequestBuilder implements HttpRequest.Builder {
         if (tenantId != null && !tenantId.isBlank()) {
             return tenantId;
         }
-        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
-        if (attributes instanceof ServletRequestAttributes servletAttributes) {
-            return servletAttributes.getRequest().getHeader(TENANT_HEADER);
-        }
-        return null;
+        return TenantContext.getTenantId();
     }
 
     private PerCallHttpRequestBuilder newPerCallBuilder() {

@@ -68,3 +68,7 @@ app:
   catalog:
     similarity-threshold: 0.80
     price-drift-tolerance-percent: 10.0
+  security:
+    admin-key: ${APP_ADMIN_KEY:}
+    bootstrap-api-key: ${APP_BOOTSTRAP_API_KEY:}
+    bootstrap-tenant-id: ${APP_BOOTSTRAP_TENANT_ID:smart-power}

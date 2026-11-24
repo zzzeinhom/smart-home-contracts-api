@@ -2,6 +2,7 @@ package com.zzzeinhom.contracts.controller;
 
 import com.zzzeinhom.contracts.dto.CopilotChatRequest;
 import com.zzzeinhom.contracts.dto.CopilotChatResponse;
+import com.zzzeinhom.contracts.security.TenantContext;
 import com.zzzeinhom.contracts.service.OperationsCopilotService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -9,7 +10,6 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,9 +24,8 @@ public class CopilotController {
     }
 
     @PostMapping("/chat")
-    public ResponseEntity<CopilotChatResponse> chat(
-            @RequestHeader(value = "X-Tenant-Id", defaultValue = "default") String tenantId,
-            @Valid @RequestBody CopilotChatRequest request) {
+    public ResponseEntity<CopilotChatResponse> chat(@Valid @RequestBody CopilotChatRequest request) {
+        String tenantId = TenantContext.requireTenantId();
         CopilotChatResponse response = operationsCopilotService.chat(
                 tenantId,
                 request.conversationId(),
@@ -35,9 +34,8 @@ public class CopilotController {
     }
 
     @DeleteMapping("/chat/{conversationId}")
-    public ResponseEntity<Void> clearConversation(
-            @RequestHeader(value = "X-Tenant-Id", defaultValue = "default") String tenantId,
-            @PathVariable String conversationId) {
+    public ResponseEntity<Void> clearConversation(@PathVariable String conversationId) {
+        String tenantId = TenantContext.requireTenantId();
         operationsCopilotService.clearConversation(tenantId, conversationId);
         return ResponseEntity.noContent().build();
     }
